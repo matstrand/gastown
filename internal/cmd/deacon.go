@@ -413,11 +413,19 @@ func startDeaconSession(t *tmux.Tmux, sessionName, agentOverride string) error {
 		return fmt.Errorf("ensuring runtime settings: %w", err)
 	}
 
+	// Auto-sling mol-deacon-patrol BEFORE starting session.
+	// This ensures the deacon has a patrol molecule on its hook when it starts,
+	// preventing improvised patrols without proper backoff. See: gt-rn9
+	if err := slingDeaconPatrol(townRoot); err != nil {
+		// Log warning but continue - deacon can still work without patrol
+		fmt.Printf("Warning: could not auto-sling patrol: %v\n", err)
+	}
+
 	initialPrompt := session.BuildStartupPrompt(session.BeaconConfig{
 		Recipient: "deacon",
 		Sender:    "daemon",
 		Topic:     "patrol",
-	}, "I am Deacon. First run `gt deacon heartbeat`. Then check gt hook, if empty create mol-deacon-patrol wisp and execute it.")
+	}, "I am Deacon. First run `gt deacon heartbeat`. Then run `gt hook` to see your work, and execute the patrol steps.")
 	startupCmd, err := config.BuildAgentStartupCommandWithAgentOverride("deacon", "", townRoot, "", initialPrompt, agentOverride)
 	if err != nil {
 		return fmt.Errorf("building startup command: %w", err)
@@ -1280,4 +1288,72 @@ func runDeaconZombieScan(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// slingDeaconPatrol creates a mol-deacon-patrol wisp and hooks it to the deacon.
+// This is called during deacon startup to ensure the deacon has a patrol molecule
+// with proper backoff, instead of improvising its own patrol loop.
+func slingDeaconPatrol(townRoot string) error {
+	// Step 1: Cook the formula (ensures proto exists)
+	cookCmd := exec.Command("bd", "--no-daemon", "cook", "mol-deacon-patrol")
+	cookCmd.Dir = townRoot
+	if err := cookCmd.Run(); err != nil {
+		return fmt.Errorf("cooking formula: %w", err)
+	}
+
+	// Step 2: Create wisp instance
+	wispCmd := exec.Command("bd", "--no-daemon", "mol", "wisp", "mol-deacon-patrol", "--json")
+	wispCmd.Dir = townRoot
+	wispOut, err := wispCmd.Output()
+	if err != nil {
+		return fmt.Errorf("creating wisp: %w", err)
+	}
+
+	// Parse wisp output to get the root ID
+	wispRootID, err := parseDeaconWispID(wispOut)
+	if err != nil {
+		return fmt.Errorf("parsing wisp output: %w", err)
+	}
+
+	// Step 3: Hook the wisp to deacon
+	hookCmd := exec.Command("bd", "--no-daemon", "update", wispRootID, "--status=hooked", "--assignee=deacon/")
+	hookCmd.Dir = townRoot
+	if err := hookCmd.Run(); err != nil {
+		return fmt.Errorf("hooking wisp: %w", err)
+	}
+
+	// Step 4: Update deacon agent bead's hook_bead field
+	agentBeadID := beads.DeaconBeadIDTown()
+	slotCmd := exec.Command("bd", "--no-daemon", "slot", "set", agentBeadID, "hook_bead", wispRootID)
+	slotCmd.Dir = townRoot
+	if err := slotCmd.Run(); err != nil {
+		// Non-fatal: deacon can still find work via bd ready
+		fmt.Printf("Warning: could not update hook_bead slot: %v\n", err)
+	}
+
+	fmt.Printf("✓ Auto-slung mol-deacon-patrol: %s\n", wispRootID)
+	return nil
+}
+
+// parseDeaconWispID extracts the wisp ID from bd mol wisp --json output.
+func parseDeaconWispID(jsonOutput []byte) (string, error) {
+	var result struct {
+		NewEpicID string `json:"new_epic_id"`
+		RootID    string `json:"root_id"`
+		ResultID  string `json:"result_id"`
+	}
+	if err := json.Unmarshal(jsonOutput, &result); err != nil {
+		return "", fmt.Errorf("parsing wisp JSON: %w", err)
+	}
+
+	switch {
+	case result.NewEpicID != "":
+		return result.NewEpicID, nil
+	case result.RootID != "":
+		return result.RootID, nil
+	case result.ResultID != "":
+		return result.ResultID, nil
+	default:
+		return "", fmt.Errorf("wisp JSON missing id field")
+	}
 }
