@@ -310,3 +310,71 @@ Dog returns to available state in the pool.
 description = "Scan scope: 'town' or specific rig name"
 required = true
 default = "town"
+
+[vars.action]
+description = "Action taken on orphan (computed)"
+default = ""
+
+[vars.action_summary]
+description = "Summary of all actions taken (computed)"
+default = ""
+
+[vars.burn_count]
+description = "Number of orphans burned (computed)"
+default = ""
+
+[vars.escalate_count]
+description = "Number of orphans escalated (computed)"
+default = ""
+
+[vars.escalations_section]
+description = "Section listing escalations (computed)"
+default = ""
+
+[vars.id]
+description = "Orphan identifier (computed)"
+default = ""
+
+[vars.issue_count]
+description = "Number of orphaned issues (computed)"
+default = ""
+
+[vars.mol_count]
+description = "Number of orphaned molecules (computed)"
+default = ""
+
+[vars.reason]
+description = "Reason for orphan state (computed)"
+default = ""
+
+[vars.reassign_count]
+description = "Number of orphans reassigned (computed)"
+default = ""
+
+[vars.recover_count]
+description = "Number of orphans recovered (computed)"
+default = ""
+
+[vars.report]
+description = "Detailed report content (computed)"
+default = ""
+
+[vars.reset_count]
+description = "Number of orphans reset (computed)"
+default = ""
+
+[vars.timestamp]
+description = "Scan timestamp (computed)"
+default = ""
+
+[vars.total_count]
+description = "Total number of orphans found (computed)"
+default = ""
+
+[vars.type]
+description = "Type of orphan (computed)"
+default = ""
+
+[vars.wisp_count]
+description = "Number of orphaned wisps (computed)"
+default = ""
