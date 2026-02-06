@@ -1,0 +1,317 @@
+# Code Review Convoy Formula - Balanced
+#
+# A balanced review covering correctness, security, design quality,
+# code smells, wiring gaps, and test quality.
+#
+# Usage:
+#   gt formula run code-review-balanced --pr=123
+#   gt formula run code-review-balanced --files="src/*.go"
+
+description = """
+Balanced code review covering core quality aspects.
+
+This is a focused review that balances thoroughness with speed, covering:
+- Correctness (logic & edge cases)
+- Security (vulnerabilities)
+- Elegance (design quality)
+- Smells (anti-patterns)
+- Wiring (unused dependencies)
+- Test Quality (meaningful tests)
+
+## Execution Model
+1. Each leg spawns as a separate polecat
+2. Polecats work in parallel (6 legs)
+3. Each writes findings to their designated output
+4. Synthesis step combines all findings into unified review
+"""
+formula = "code-review-balanced"
+type = "convoy"
+version = 1
+
+# Input variables - provided at runtime
+[inputs]
+[inputs.pr]
+description = "Pull request number to review"
+type = "number"
+required_unless = ["files", "branch"]
+
+[inputs.files]
+description = "File glob pattern to review"
+type = "string"
+required_unless = ["pr", "branch"]
+
+[inputs.branch]
+description = "Branch name to review (diff against main)"
+type = "string"
+required_unless = ["pr", "files"]
+
+# Base prompt template - injected into all leg prompts
+# NOTE: Uses Go text/template syntax (not Handlebars)
+[prompts]
+base = """
+# Code Review Assignment
+
+You are a specialized code reviewer participating in a convoy review.
+
+## Context
+- **Formula**: {{.formula_name}}
+- **Review target**: {{.target_description}}
+- **Your focus**: {{.leg.focus}}
+- **Leg ID**: {{.leg.id}}
+
+## Scope: ONLY Review PR Changes
+{{if .pr_number -}}
+**IMPORTANT**: Only review the changes introduced in PR #{{.pr_number}}. Do NOT review the entire codebase.
+
+PR #{{.pr_number}}: {{.pr_title}}
+
+Changed files:
+{{range .changed_files -}}
+- {{.path}} (+{{.additions}}/-{{.deletions}})
+{{end -}}
+
+**How to review:**
+1. Use `gh pr diff {{.pr_number}}` to see the actual changes
+2. Only review the modified/added lines (marked with + in diff)
+3. Focus on what's NEW or CHANGED in this PR
+4. Do NOT scan or review unchanged files or code
+{{else -}}
+**Target files:**
+{{range .files -}}
+- {{.}}
+{{end -}}
+{{end}}
+
+## Your Task
+{{.leg.description}}
+
+## Output Requirements
+Write your findings to: **{{.output_path}}**
+
+Structure your output as follows:
+```markdown
+# {{.leg.title}} Review
+
+## Summary
+(1-2 paragraph overview of findings)
+
+## Critical Issues
+(P0 - Must fix before merge)
+- Issue description with file:line reference
+- Explanation of impact
+- Suggested fix
+
+## Major Issues
+(P1 - Should fix before merge)
+- ...
+
+## Minor Issues
+(P2 - Nice to fix)
+- ...
+
+## Observations
+(Non-blocking notes and suggestions)
+- ...
+```
+
+Use specific file:line references. Be actionable. Prioritize impact.
+"""
+
+# Output configuration
+[output]
+directory = ".reviews/{{.review_id}}"
+leg_pattern = "{{.leg.id}}-findings.md"
+synthesis = "review-summary.md"
+
+# Leg definitions - each spawns a parallel polecat
+[[legs]]
+id = "correctness"
+title = "Correctness Review"
+focus = "Logical correctness and edge case handling"
+description = """
+Review the code for logical errors and edge case handling.
+
+**Look for:**
+- Logic errors and bugs
+- Off-by-one errors
+- Null/nil/undefined handling
+- Unhandled edge cases
+- Race conditions in concurrent code
+- Dead code or unreachable branches
+- Incorrect assumptions in comments vs code
+- Integer overflow/underflow potential
+- Floating point comparison issues
+
+**Questions to answer:**
+- Does the code do what it claims to do?
+- What inputs could cause unexpected behavior?
+- Are all code paths tested or obviously correct?
+"""
+
+[[legs]]
+id = "security"
+title = "Security Review"
+focus = "Security vulnerabilities and attack surface"
+description = """
+Review the code for security vulnerabilities.
+
+**Look for:**
+- Input validation gaps
+- Authentication/authorization bypasses
+- Injection vulnerabilities (SQL, XSS, command, LDAP)
+- Sensitive data exposure (logs, errors, responses)
+- Hardcoded secrets or credentials
+- Insecure cryptographic usage
+- Path traversal vulnerabilities
+- SSRF (Server-Side Request Forgery)
+- Deserialization vulnerabilities
+- OWASP Top 10 concerns
+
+**Questions to answer:**
+- What can a malicious user do with this code?
+- What data could be exposed if this fails?
+- Are there defense-in-depth gaps?
+"""
+
+[[legs]]
+id = "elegance"
+title = "Elegance Review"
+focus = "Design clarity and abstraction quality"
+description = """
+Review the code for design quality.
+
+**Look for:**
+- Unclear abstractions or naming
+- Functions doing too many things
+- Missing or over-engineered abstractions
+- Coupling that should be loose
+- Dependencies that flow the wrong direction
+- Unclear data flow or control flow
+- Magic numbers/strings without explanation
+- Inconsistent design patterns
+- Violation of SOLID principles
+- Reinventing existing utilities
+
+**Questions to answer:**
+- Would a new team member understand this?
+- Does the structure match the problem domain?
+- Is the complexity justified?
+"""
+
+[[legs]]
+id = "smells"
+title = "Code Smells Review"
+focus = "Anti-patterns and technical debt"
+description = """
+Review the code for code smells and anti-patterns.
+
+**Look for:**
+- Long methods (>50 lines is suspicious)
+- Deep nesting (>3 levels)
+- Shotgun surgery patterns
+- Feature envy
+- Data clumps
+- Primitive obsession
+- Temporary fields
+- Refused bequest
+- Speculative generality
+- God classes/functions
+- Copy-paste code (DRY violations)
+- TODO/FIXME accumulation
+
+**Questions to answer:**
+- What will cause pain during the next change?
+- What would you refactor if you owned this code?
+- Is technical debt being added or paid down?
+"""
+
+[[legs]]
+id = "wiring"
+title = "Wiring Review"
+focus = "Installed-but-not-wired gaps"
+description = """
+Detect dependencies, configs, or libraries that were added but not actually used.
+
+This catches subtle bugs where the implementer THINKS they integrated something,
+but the old implementation is still being used.
+
+**Look for:**
+- New dependency in manifest but never imported
+  - Go: module in go.mod but no import
+  - Rust: crate in Cargo.toml but no `use`
+  - Node: package in package.json but no import/require
+
+- SDK added but old implementation remains
+  - Added Sentry but still using console.error for errors
+  - Added Zod but still using manual typeof validation
+
+- Config/env var defined but never loaded
+  - New .env var that isn't accessed in code
+
+**Questions to answer:**
+- Is every new dependency actually used?
+- Are there old patterns that should have been replaced?
+- Is there dead config that suggests incomplete migration?
+"""
+
+[[legs]]
+id = "test-quality"
+title = "Test Quality Review"
+focus = "Test meaningfulness, not just coverage"
+description = """
+Verify tests are actually testing something meaningful.
+
+Coverage numbers lie. A test that can't fail provides no value.
+
+**Look for:**
+- Weak assertions
+  - Only checking != nil / !== null / is not None
+  - Using .is_ok() without checking the value
+  - assertTrue(true) or equivalent
+
+- Missing negative test cases
+  - Happy path only, no error cases
+  - No boundary testing
+  - No invalid input testing
+
+- Tests that can't fail
+  - Mocked so heavily the test is meaningless
+  - Testing implementation details, not behavior
+
+- Flaky test indicators
+  - Sleep/delay in tests
+  - Time-dependent assertions
+
+**Questions to answer:**
+- Do these tests actually verify behavior?
+- Would a bug in the implementation cause a test failure?
+- Are edge cases and error paths tested?
+"""
+
+# Synthesis step - combines all leg outputs
+[synthesis]
+title = "Review Synthesis"
+description = """
+Combine all leg findings into a unified, prioritized review.
+
+**Your input:**
+All leg findings from: {{.output.directory}}/
+
+**Your output:**
+A synthesized review at: {{.output.directory}}/{{.output.synthesis}}
+
+**Structure:**
+1. **Executive Summary** - Overall assessment, merge recommendation
+2. **Critical Issues** - P0 items from all legs, deduplicated
+3. **Major Issues** - P1 items, grouped by theme
+4. **Minor Issues** - P2 items, briefly listed
+5. **Design & Code Quality** - Elegance and code smell findings
+6. **Wiring Gaps** - Dependencies added but not used
+7. **Test Quality** - Assessment of test meaningfulness
+8. **Positive Observations** - What's done well
+9. **Recommendations** - Actionable next steps
+
+Deduplicate issues found by multiple legs (note which legs found them).
+Prioritize by impact and effort. Be actionable.
+"""
+depends_on = ["correctness", "security", "elegance", "smells", "wiring", "test-quality"]

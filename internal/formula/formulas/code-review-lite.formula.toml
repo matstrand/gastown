@@ -1,0 +1,244 @@
+# Code Review Convoy Formula - Lite
+#
+# A lightweight review focusing on correctness and code smells.
+#
+# Usage:
+#   gt formula run code-review-lite --pr=123
+#   gt formula run code-review-lite --files="src/*.go"
+
+description = """
+Lightweight but comprehensive code review hitting all critical issues.
+
+This is a fast review with 2 broad legs covering the essentials:
+- **Critical Issues**: Correctness + Security (bugs & vulnerabilities)
+- **Quality & Integration**: Wiring + Code Smells + Test Quality
+
+Perfect for catching high-impact issues quickly without sacrificing coverage.
+
+## Execution Model
+1. Each leg spawns as a separate polecat
+2. Polecats work in parallel (2 legs)
+3. Each writes findings to their designated output
+4. Synthesis step combines all findings into unified review
+"""
+formula = "code-review-lite"
+type = "convoy"
+version = 1
+
+# Input variables - provided at runtime
+[inputs]
+[inputs.pr]
+description = "Pull request number to review"
+type = "number"
+required_unless = ["files", "branch"]
+
+[inputs.files]
+description = "File glob pattern to review"
+type = "string"
+required_unless = ["pr", "branch"]
+
+[inputs.branch]
+description = "Branch name to review (diff against main)"
+type = "string"
+required_unless = ["pr", "files"]
+
+# Base prompt template - injected into all leg prompts
+# NOTE: Uses Go text/template syntax (not Handlebars)
+[prompts]
+base = """
+# Code Review Assignment
+
+You are a specialized code reviewer participating in a convoy review.
+
+## Context
+- **Formula**: {{.formula_name}}
+- **Review target**: {{.target_description}}
+- **Your focus**: {{.leg.focus}}
+- **Leg ID**: {{.leg.id}}
+
+## Scope: ONLY Review PR Changes
+{{if .pr_number -}}
+**IMPORTANT**: Only review the changes introduced in PR #{{.pr_number}}. Do NOT review the entire codebase.
+
+PR #{{.pr_number}}: {{.pr_title}}
+
+Changed files:
+{{range .changed_files -}}
+- {{.path}} (+{{.additions}}/-{{.deletions}})
+{{end -}}
+
+**How to review:**
+1. Use `gh pr diff {{.pr_number}}` to see the actual changes
+2. Only review the modified/added lines (marked with + in diff)
+3. Focus on what's NEW or CHANGED in this PR
+4. Do NOT scan or review unchanged files or code
+{{else -}}
+**Target files:**
+{{range .files -}}
+- {{.}}
+{{end -}}
+{{end}}
+
+## Your Task
+{{.leg.description}}
+
+## Output Requirements
+Write your findings to: **{{.output_path}}**
+
+Structure your output as follows:
+```markdown
+# {{.leg.title}} Review
+
+## Summary
+(1-2 paragraph overview of findings)
+
+## Critical Issues
+(P0 - Must fix before merge)
+- Issue description with file:line reference
+- Explanation of impact
+- Suggested fix
+
+## Major Issues
+(P1 - Should fix before merge)
+- ...
+
+## Minor Issues
+(P2 - Nice to fix)
+- ...
+
+## Observations
+(Non-blocking notes and suggestions)
+- ...
+```
+
+Use specific file:line references. Be actionable. Prioritize impact.
+"""
+
+# Output configuration
+[output]
+directory = ".reviews/{{.review_id}}"
+leg_pattern = "{{.leg.id}}-findings.md"
+synthesis = "review-summary.md"
+
+# Leg definitions - each spawns a parallel polecat
+[[legs]]
+id = "critical-issues"
+title = "Critical Issues Review"
+focus = "Correctness and security vulnerabilities"
+description = """
+Review for bugs and security vulnerabilities that could break the system or expose it to attacks.
+
+## Correctness Issues
+**Look for:**
+- Logic errors and bugs
+- Off-by-one errors
+- Null/nil/undefined handling gaps
+- Unhandled edge cases
+- Race conditions in concurrent code
+- Dead code or unreachable branches
+- Integer overflow/underflow potential
+
+**Questions:**
+- Does the code do what it claims to do?
+- What inputs could cause unexpected behavior?
+- Are all code paths safe and correct?
+
+## Security Issues
+**Look for:**
+- Input validation gaps (especially user-controlled data)
+- Injection vulnerabilities (SQL, XSS, command injection)
+- Authentication/authorization bypasses
+- Sensitive data exposure (logs, errors, responses, comments)
+- Hardcoded secrets or credentials
+- Path traversal vulnerabilities
+- Insecure cryptographic usage
+- SSRF (Server-Side Request Forgery)
+
+**Questions:**
+- What can a malicious user do with this code?
+- What data could be exposed if this fails?
+- Are user inputs properly validated and sanitized?
+
+**Priority:** Focus on P0/P1 issues that would cause production failures or security incidents.
+"""
+
+[[legs]]
+id = "quality-integration"
+title = "Quality & Integration Review"
+focus = "Wiring gaps, code smells, and test quality"
+description = """
+Review for maintenance issues, integration gaps, and test quality problems.
+
+## Wiring Issues (Critical)
+**Look for:**
+- New dependency in manifest but never imported
+  - Go: module in go.mod but no import
+  - Rust: crate in Cargo.toml but no `use`
+  - Node: package in package.json but no import/require
+- SDK added but old implementation remains
+  - Added Sentry but still using console.error
+  - Added validation library but still using manual checks
+- Config/env vars defined but never loaded
+
+**Questions:**
+- Is every new dependency actually used?
+- Are old patterns still running when new ones should be?
+
+## Critical Code Smells
+**Look for:**
+- Long methods (>50 lines is suspicious, >100 is a problem)
+- Deep nesting (>3 levels indicates complexity issues)
+- Copy-paste code (DRY violations that will cause maintenance pain)
+- God classes/functions (doing too many unrelated things)
+- Shotgun surgery (one change requires touching many files)
+- Magic numbers/strings without explanation
+
+**Questions:**
+- What will cause pain during the next change?
+- Is this code easy to understand and modify?
+
+## Test Quality Issues
+**Look for:**
+- Weak assertions (only checking != nil/null without verifying values)
+- Missing negative test cases (no error handling tests)
+- Tests that can't fail (mocked so heavily they're meaningless)
+- Missing edge case testing
+- Flaky test indicators (sleep/delays, time-dependent assertions)
+
+**Questions:**
+- Would a bug in the implementation cause a test failure?
+- Are tests actually verifying behavior or just exercising code?
+
+**Priority:** Focus on issues that will cause future maintenance problems or subtle production bugs.
+"""
+
+# Synthesis step - combines all leg outputs
+[synthesis]
+title = "Review Synthesis"
+description = """
+Combine all leg findings into a unified, prioritized review.
+
+**Your input:**
+All leg findings from: {{.output.directory}}/
+
+**Your output:**
+A synthesized review at: {{.output.directory}}/{{.output.synthesis}}
+
+**Structure:**
+1. **Executive Summary** - Overall assessment, merge recommendation
+2. **Critical Issues (P0)** - Must fix before merge
+   - Security vulnerabilities
+   - Correctness bugs
+   - Wiring gaps (unused dependencies)
+3. **Major Issues (P1)** - Should fix before merge
+   - Code smells that will cause maintenance pain
+   - Test quality issues
+   - Design problems
+4. **Minor Issues (P2)** - Nice to fix
+5. **Positive Observations** - What's done well
+6. **Recommendations** - Actionable next steps prioritized by impact
+
+Deduplicate issues found by multiple legs (note which legs found them).
+Prioritize by impact and effort. Be actionable and specific.
+"""
+depends_on = ["critical-issues", "quality-integration"]

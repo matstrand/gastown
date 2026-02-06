@@ -1,0 +1,153 @@
+description = """
+Execute a single convoy leg review.
+
+This is a minimal molecule for convoy leg polecats. The leg bead description
+contains the full review prompt with all instructions, so this molecule just
+executes the review and writes findings to the specified output file.
+
+## Convoy Leg Contract
+
+You are a specialized reviewer in a parallel convoy. You:
+1. Read your leg bead description (contains full review instructions)
+2. Execute the review according to those instructions
+3. Write findings to the output file path specified in the bead
+4. Complete via `gt done` (sync + nuke yourself)
+
+**Important:** Your bead description contains:
+- The review focus area
+- The PR or files to review
+- The output file path to write findings
+- Full instructions on what to look for
+
+Do NOT read this formula file. Use `bd ready` to find your step beads.
+
+## Self-Cleaning Model
+
+Once you run `gt done`, you're gone. The command:
+1. Syncs beads (final sync)
+2. Nukes your sandbox
+3. Exits your session immediately
+
+Done means gone. Your findings remain in the output file for synthesis.
+"""
+formula = "mol-convoy-leg"
+version = 1
+
+[[steps]]
+id = "execute-review"
+title = "Execute convoy leg review"
+description = """
+Perform your assigned review leg.
+
+**1. Prime your environment:**
+```bash
+gt prime                    # Load role context
+bd prime                    # Load beads context
+```
+
+**2. Check your hook:**
+```bash
+gt hook                     # Shows your pinned molecule and bead
+```
+
+**3. Read your assignment:**
+```bash
+bd show <your-bead-id>      # Full instructions are in the description
+```
+
+Your bead description contains:
+- **Review scope** (PR number or files)
+- **Review focus** (what aspect to review)
+- **Output path** (where to write findings)
+- **Full instructions** (what to look for, how to structure output)
+
+**4. Fetch the PR diff (if PR-based):**
+```bash
+gh pr diff <pr-number>      # See actual changes
+```
+
+**5. Perform the review:**
+Follow the instructions in your bead description exactly. The instructions
+tell you what to look for and how to structure your findings.
+
+**6. Write findings to the specified output file:**
+The output path is specified in your bead description. Create the file and
+write your findings in markdown format as instructed.
+
+Example:
+```bash
+# If output path is .reviews/abc123/security-findings.md
+cat > .reviews/abc123/security-findings.md <<'EOF'
+# Security Review
+
+## Summary
+(your findings here)
+
+## Critical Issues
+- None found
+
+## Major Issues
+- Issue description with file:line reference
+
+... etc
+EOF
+```
+
+**Exit criteria:**
+- Review complete according to your leg's focus
+- Findings written to specified output file
+"""
+
+[[steps]]
+id = "verify-output"
+title = "Verify findings file created"
+needs = ["execute-review"]
+description = """
+Confirm your findings file was created successfully.
+
+**1. Check the output file exists:**
+```bash
+ls -lh <output-path-from-bead>
+```
+
+**2. Verify the content:**
+```bash
+head -50 <output-path-from-bead>
+```
+
+**3. Ensure it follows the structure:**
+- Has markdown header with leg title
+- Contains Summary section
+- Contains Critical/Major/Minor Issues sections
+- Uses file:line references for issues
+
+**Exit criteria:** Output file exists and is properly formatted.
+"""
+
+[[steps]]
+id = "complete-and-exit"
+title = "Complete leg and self-clean"
+needs = ["verify-output"]
+description = """
+Mark your leg complete and exit.
+
+**Self-Cleaning Model:**
+Once you run `gt done`, you're gone. The command:
+1. Syncs beads (final sync)
+2. Nukes your sandbox
+3. Exits your session immediately
+
+**Run gt done:**
+```bash
+gt done
+```
+
+**What happens next (not your concern):**
+- Other convoy legs complete in parallel
+- Synthesis step combines all leg findings
+- Final review summary is generated
+
+You are NOT involved in synthesis. You're gone. Done means gone.
+
+**Exit criteria:** Beads synced, sandbox nuked, session exited.
+"""
