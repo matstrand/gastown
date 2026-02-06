@@ -2,52 +2,18 @@ package cmd
 
 import (
 	"github.com/steveyegge/gastown/internal/cli"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"github.com/steveyegge/gastown/internal/beads"
 	"github.com/steveyegge/gastown/internal/events"
 	"github.com/steveyegge/gastown/internal/style"
 	"github.com/steveyegge/gastown/internal/tmux"
+	"github.com/steveyegge/gastown/internal/wisp"
 	"github.com/steveyegge/gastown/internal/workspace"
 )
-
-type wispCreateJSON struct {
-	NewEpicID string `json:"new_epic_id"`
-	RootID    string `json:"root_id"`
-	ResultID  string `json:"result_id"`
-}
-
-func parseWispIDFromJSON(jsonOutput []byte) (string, error) {
-	var result wispCreateJSON
-	if err := json.Unmarshal(jsonOutput, &result); err != nil {
-		return "", fmt.Errorf("parsing wisp JSON: %w (output: %s)", err, trimJSONForError(jsonOutput))
-	}
-
-	switch {
-	case result.NewEpicID != "":
-		return result.NewEpicID, nil
-	case result.RootID != "":
-		return result.RootID, nil
-	case result.ResultID != "":
-		return result.ResultID, nil
-	default:
-		return "", fmt.Errorf("wisp JSON missing id field (expected one of new_epic_id, root_id, result_id); output: %s", trimJSONForError(jsonOutput))
-	}
-}
-
-func trimJSONForError(jsonOutput []byte) string {
-	s := strings.TrimSpace(string(jsonOutput))
-	const maxLen = 500
-	if len(s) > maxLen {
-		return s[:maxLen] + "..."
-	}
-	return s
-}
 
 // verifyFormulaExists checks that the formula exists using bd formula show.
 // Formulas are TOML files (.formula.toml).
@@ -218,7 +184,7 @@ func runSlingFormula(args []string) error {
 	}
 
 	// Parse wisp output to get the root ID
-	wispRootID, err := parseWispIDFromJSON(wispOut)
+	wispRootID, err := wisp.ParseWispIDFromJSON(wispOut)
 	if err != nil {
 		return fmt.Errorf("parsing wisp output: %w", err)
 	}

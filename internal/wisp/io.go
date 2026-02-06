@@ -41,3 +41,40 @@ func writeJSON(path string, v interface{}) error {
 
 	return nil
 }
+
+// WispCreateJSON is the JSON structure returned by bd mol wisp --json.
+type WispCreateJSON struct {
+	NewEpicID string `json:"new_epic_id"`
+	RootID    string `json:"root_id"`
+	ResultID  string `json:"result_id"`
+}
+
+// ParseWispIDFromJSON extracts the wisp ID from bd mol wisp --json output.
+// It checks for new_epic_id, root_id, and result_id fields in that order.
+func ParseWispIDFromJSON(jsonOutput []byte) (string, error) {
+	var result WispCreateJSON
+	if err := json.Unmarshal(jsonOutput, &result); err != nil {
+		return "", fmt.Errorf("parsing wisp JSON: %w (output: %s)", err, trimJSONForError(jsonOutput))
+	}
+
+	switch {
+	case result.NewEpicID != "":
+		return result.NewEpicID, nil
+	case result.RootID != "":
+		return result.RootID, nil
+	case result.ResultID != "":
+		return result.ResultID, nil
+	default:
+		return "", fmt.Errorf("wisp JSON missing id field (expected one of new_epic_id, root_id, result_id); output: %s", trimJSONForError(jsonOutput))
+	}
+}
+
+// trimJSONForError truncates JSON output for error messages.
+func trimJSONForError(jsonOutput []byte) string {
+	const maxLen = 500
+	s := string(jsonOutput)
+	if len(s) > maxLen {
+		return s[:maxLen] + "..."
+	}
+	return s
+}

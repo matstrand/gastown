@@ -6,6 +6,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/steveyegge/gastown/internal/wisp"
 )
 
 func writeBDStub(t *testing.T, binDir string, unixScript string, windowsScript string) string {
@@ -77,12 +79,12 @@ func TestParseWispIDFromJSON(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotID, err := parseWispIDFromJSON([]byte(tt.json))
+			gotID, err := wisp.ParseWispIDFromJSON([]byte(tt.json))
 			if (err != nil) != tt.wantErr {
-				t.Fatalf("parseWispIDFromJSON() error = %v, wantErr %v", err, tt.wantErr)
+				t.Fatalf("wisp.ParseWispIDFromJSON() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if gotID != tt.wantID {
-				t.Fatalf("parseWispIDFromJSON() id = %q, want %q", gotID, tt.wantID)
+				t.Fatalf("wisp.ParseWispIDFromJSON() id = %q, want %q", gotID, tt.wantID)
 			}
 		})
 	}

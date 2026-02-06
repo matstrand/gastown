@@ -97,7 +97,10 @@ Stops the current session (if running) and starts a fresh one.`,
 	RunE: runDeaconRestart,
 }
 
-var deaconAgentOverride string
+var (
+	deaconAgentOverride string
+	deaconNoPatrol      bool
+)
 
 var deaconHeartbeatCmd = &cobra.Command{
 	Use:   "heartbeat [action]",
@@ -360,8 +363,11 @@ func init() {
 		"List zombies without killing them")
 
 	deaconStartCmd.Flags().StringVar(&deaconAgentOverride, "agent", "", "Agent alias to run the Deacon with (overrides town default)")
+	deaconStartCmd.Flags().BoolVar(&deaconNoPatrol, "no-patrol", false, "Skip auto-slinging patrol molecule (for debugging/testing)")
 	deaconAttachCmd.Flags().StringVar(&deaconAgentOverride, "agent", "", "Agent alias to run the Deacon with (overrides town default)")
+	deaconAttachCmd.Flags().BoolVar(&deaconNoPatrol, "no-patrol", false, "Skip auto-slinging patrol molecule (for debugging/testing)")
 	deaconRestartCmd.Flags().StringVar(&deaconAgentOverride, "agent", "", "Agent alias to run the Deacon with (overrides town default)")
+	deaconRestartCmd.Flags().BoolVar(&deaconNoPatrol, "no-patrol", false, "Skip auto-slinging patrol molecule (for debugging/testing)")
 
 	rootCmd.AddCommand(deaconCmd)
 }
@@ -413,11 +419,21 @@ func startDeaconSession(t *tmux.Tmux, sessionName, agentOverride string) error {
 		return fmt.Errorf("ensuring runtime settings: %w", err)
 	}
 
+	// Auto-sling mol-deacon-patrol BEFORE starting session (unless --no-patrol).
+	// This ensures the deacon has a patrol molecule on its hook when it starts,
+	// preventing improvised patrols without proper backoff.
+	if !deaconNoPatrol {
+		if err := deacon.SlingDeaconPatrol(townRoot); err != nil {
+			// Log warning but continue - deacon can still work without patrol
+			fmt.Printf("Warning: could not auto-sling patrol: %v\n", err)
+		}
+	}
+
 	initialPrompt := session.BuildStartupPrompt(session.BeaconConfig{
 		Recipient: "deacon",
 		Sender:    "daemon",
 		Topic:     "patrol",
-	}, "I am Deacon. First run `gt deacon heartbeat`. Then check gt hook, if empty create mol-deacon-patrol wisp and execute it.")
+	}, "I am Deacon. First run `gt deacon heartbeat`. Then run `gt hook` to see your work, and execute the patrol steps.")
 	startupCmd, err := config.BuildAgentStartupCommandWithAgentOverride("deacon", "", townRoot, "", initialPrompt, agentOverride)
 	if err != nil {
 		return fmt.Errorf("building startup command: %w", err)

@@ -12,6 +12,7 @@ import (
 	"github.com/steveyegge/gastown/internal/beads"
 	"github.com/steveyegge/gastown/internal/constants"
 	"github.com/steveyegge/gastown/internal/tmux"
+	"github.com/steveyegge/gastown/internal/wisp"
 	"github.com/steveyegge/gastown/internal/workspace"
 )
 
@@ -620,7 +621,7 @@ func InstantiateFormulaOnBead(formulaName, beadID, title, hookWorkDir, townRoot 
 	}
 
 	// Parse wisp output to get the root ID
-	wispRootID, err := parseWispIDFromJSON(wispOut)
+	wispRootID, err := wisp.ParseWispIDFromJSON(wispOut)
 	if err != nil {
 		return nil, fmt.Errorf("parsing wisp output: %w", err)
 	}
