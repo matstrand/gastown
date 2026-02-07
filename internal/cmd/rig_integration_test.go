@@ -843,3 +843,54 @@ func TestAgentBeadIDs(t *testing.T) {
 		})
 	}
 }
+
+// TestRigAddUpdatesGitignore verifies that gt rig add updates
+// the town .gitignore file with the new rig directory.
+func TestRigAddUpdatesGitignore(t *testing.T) {
+	_ = mockBdCommand(t)
+	townRoot := setupTestTown(t)
+	gitURL := createTestGitRepo(t, "gitignoretest")
+
+	// Create initial .gitignore with some content
+	gitignorePath := filepath.Join(townRoot, ".gitignore")
+	if err := os.WriteFile(gitignorePath, []byte("# Town .gitignore\nnode_modules/\n"), 0644); err != nil {
+		t.Fatalf("writing .gitignore: %v", err)
+	}
+
+	rigsPath := filepath.Join(townRoot, "mayor", "rigs.json")
+	rigsConfig, err := config.LoadRigsConfig(rigsPath)
+	if err != nil {
+		t.Fatalf("load rigs.json: %v", err)
+	}
+
+	g := git.NewGit(townRoot)
+	mgr := rig.NewManager(townRoot, rigsConfig, g)
+
+	_, err = mgr.AddRig(rig.AddRigOptions{
+		Name:   "gitignoretest",
+		GitURL: gitURL,
+	})
+	if err != nil {
+		t.Fatalf("AddRig: %v", err)
+	}
+
+	// Call EnsureGitignoreEntry (mirrors runRigAdd in internal/cmd/rig.go:434-438)
+	if err := mgr.EnsureGitignoreEntry(gitignorePath, "gitignoretest/"); err != nil {
+		t.Fatalf("EnsureGitignoreEntry: %v", err)
+	}
+
+	// Verify .gitignore was updated
+	content, err := os.ReadFile(gitignorePath)
+	if err != nil {
+		t.Fatalf("reading .gitignore: %v", err)
+	}
+
+	if !strings.Contains(string(content), "gitignoretest/") {
+		t.Errorf(".gitignore should contain 'gitignoretest/', got:\n%s", string(content))
+	}
+
+	// Verify original content is preserved
+	if !strings.Contains(string(content), "node_modules/") {
+		t.Errorf(".gitignore should preserve 'node_modules/', got:\n%s", string(content))
+	}
+}
