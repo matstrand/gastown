@@ -779,8 +779,8 @@ func (m *Manager) initAgentBeads(rigPath, rigName, prefix string) error {
 	return nil
 }
 
-// ensureGitignoreEntry adds an entry to .gitignore if it doesn't already exist.
-func (m *Manager) ensureGitignoreEntry(gitignorePath, entry string) error {
+// EnsureGitignoreEntry adds an entry to .gitignore if it doesn't already exist.
+func (m *Manager) EnsureGitignoreEntry(gitignorePath, entry string) error {
 	// Read existing content
 	content, err := os.ReadFile(gitignorePath)
 	if err != nil && !os.IsNotExist(err) {
@@ -1322,8 +1322,8 @@ See docs/deacon-plugins.md for full documentation.
 
 	// Add plugins/ and .repo.git/ to rig .gitignore
 	gitignorePath := filepath.Join(rigPath, ".gitignore")
-	if err := m.ensureGitignoreEntry(gitignorePath, "plugins/"); err != nil {
+	if err := m.EnsureGitignoreEntry(gitignorePath, "plugins/"); err != nil {
 		return err
 	}
-	return m.ensureGitignoreEntry(gitignorePath, ".repo.git/")
+	return m.EnsureGitignoreEntry(gitignorePath, ".repo.git/")
 }

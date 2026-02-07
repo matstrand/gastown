@@ -431,6 +431,13 @@ func runRigAdd(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Add rig directory to town .gitignore
+	townGitignore := filepath.Join(townRoot, ".gitignore")
+	if err := mgr.EnsureGitignoreEntry(townGitignore, name+"/"); err != nil {
+		// Non-fatal: user can add manually
+		fmt.Printf("  %s Could not update .gitignore: %v\n", style.Warning.Render("!"), err)
+	}
+
 	// Sync hooks for the new rig's targets
 	if err := syncRigHooks(townRoot, name); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: failed to sync hooks for new rig: %v\n", err)
