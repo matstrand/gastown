@@ -9,6 +9,10 @@
 description = """
 Lightweight but comprehensive code review hitting all critical issues.
 
+**IMPORTANT**: When reviewing a PR, agents review ONLY the changed lines
+in that PR, not the entire repository. This prevents scope creep and
+ensures focused, relevant feedback.
+
 This is a fast review with 2 broad legs covering the essentials:
 - **Critical Issues**: Correctness + Security (bugs & vulnerabilities)
 - **Quality & Integration**: Wiring + Code Smells + Test Quality
