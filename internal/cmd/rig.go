@@ -432,8 +432,7 @@ func runRigAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	// Add rig directory to town .gitignore
-	townGitignore := filepath.Join(townRoot, ".gitignore")
-	if err := mgr.EnsureGitignoreEntry(townGitignore, name+"/"); err != nil {
+	if err := mgr.AddRigToGitignore(name); err != nil {
 		// Non-fatal: user can add manually
 		fmt.Printf("  %s Could not update .gitignore: %v\n", style.Warning.Render("!"), err)
 	}

@@ -274,7 +274,7 @@ func TestEnsureGitignoreEntry_AddsEntry(t *testing.T) {
 
 	gitignorePath := filepath.Join(root, ".gitignore")
 
-	if err := manager.EnsureGitignoreEntry(gitignorePath, ".test-entry/"); err != nil {
+	if err := manager.ensureGitignoreEntry(gitignorePath, ".test-entry/"); err != nil {
 		t.Fatalf("ensureGitignoreEntry: %v", err)
 	}
 
@@ -295,7 +295,7 @@ func TestEnsureGitignoreEntry_DoesNotDuplicate(t *testing.T) {
 		t.Fatalf("writing .gitignore: %v", err)
 	}
 
-	if err := manager.EnsureGitignoreEntry(gitignorePath, ".test-entry/"); err != nil {
+	if err := manager.ensureGitignoreEntry(gitignorePath, ".test-entry/"); err != nil {
 		t.Fatalf("ensureGitignoreEntry: %v", err)
 	}
 
@@ -316,7 +316,7 @@ func TestEnsureGitignoreEntry_AppendsToExisting(t *testing.T) {
 		t.Fatalf("writing .gitignore: %v", err)
 	}
 
-	if err := manager.EnsureGitignoreEntry(gitignorePath, ".test-entry/"); err != nil {
+	if err := manager.ensureGitignoreEntry(gitignorePath, ".test-entry/"); err != nil {
 		t.Fatalf("ensureGitignoreEntry: %v", err)
 	}
 

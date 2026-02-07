@@ -779,8 +779,8 @@ func (m *Manager) initAgentBeads(rigPath, rigName, prefix string) error {
 	return nil
 }
 
-// EnsureGitignoreEntry adds an entry to .gitignore if it doesn't already exist.
-func (m *Manager) EnsureGitignoreEntry(gitignorePath, entry string) error {
+// ensureGitignoreEntry adds an entry to .gitignore if it doesn't already exist.
+func (m *Manager) ensureGitignoreEntry(gitignorePath, entry string) error {
 	// Read existing content
 	content, err := os.ReadFile(gitignorePath)
 	if err != nil && !os.IsNotExist(err) {
@@ -810,6 +810,12 @@ func (m *Manager) EnsureGitignoreEntry(gitignorePath, entry string) error {
 	}
 	_, err = f.WriteString(entry + "\n")
 	return err
+}
+
+// AddRigToGitignore adds a rig directory to the town .gitignore
+func (m *Manager) AddRigToGitignore(rigName string) error {
+	gitignorePath := filepath.Join(m.townRoot, ".gitignore")
+	return m.ensureGitignoreEntry(gitignorePath, rigName+"/")
 }
 
 // deriveBeadsPrefix generates a beads prefix from a rig name.
@@ -1322,8 +1328,8 @@ See docs/deacon-plugins.md for full documentation.
 
 	// Add plugins/ and .repo.git/ to rig .gitignore
 	gitignorePath := filepath.Join(rigPath, ".gitignore")
-	if err := m.EnsureGitignoreEntry(gitignorePath, "plugins/"); err != nil {
+	if err := m.ensureGitignoreEntry(gitignorePath, "plugins/"); err != nil {
 		return err
 	}
-	return m.EnsureGitignoreEntry(gitignorePath, ".repo.git/")
+	return m.ensureGitignoreEntry(gitignorePath, ".repo.git/")
 }
